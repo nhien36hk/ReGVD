@@ -18,7 +18,6 @@ Fine-tuning the library models for language modeling on a text file (GPT, GPT-2,
 GPT and GPT-2 are fine-tuned using a causal language modeling (CLM) loss while BERT and RoBERTa are fine-tuned
 using a masked language modeling (MLM) loss.
 """
-
 from __future__ import absolute_import, division, print_function
 
 import argparse
@@ -46,12 +45,13 @@ from tqdm import tqdm, trange
 import multiprocessing
 from model import *
 cpu_cont = multiprocessing.cpu_count()
-from transformers import (WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup,
+from transformers import (WEIGHTS_NAME, get_linear_schedule_with_warmup,
                           BertConfig, BertForMaskedLM, BertTokenizer,
                           GPT2Config, GPT2LMHeadModel, GPT2Tokenizer,
                           OpenAIGPTConfig, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer,
                           RobertaConfig, RobertaForSequenceClassification, RobertaTokenizer,
                           DistilBertConfig, DistilBertForMaskedLM, DistilBertTokenizer)
+from torch.optim import AdamW
 
 logger = logging.getLogger(__name__)
 
@@ -553,7 +553,7 @@ class Args:
         self.evaluate_during_training = True
         self.gnn="ReGCN"
         self.learning_rate=5e-4
-        self.epoch=30
+        self.epoch=1
         self.hidden_size=256
         self.num_GNN_layers=2
         self.format="uni"
@@ -574,7 +574,7 @@ class Args:
         self.save_steps=50
         self.save_total_limit=None,
         self.eval_all_checkpoints=False
-        self.no_cuda=True
+        self.no_cuda=False
         self.overwrite_output_dir=False
         self.overwrite_cache=False
         self.fp16=False
@@ -593,14 +593,14 @@ class Args:
         self.result_dir = 'results'
         self.test_split = 'test'
 
-BASE_DIR = 'data/'
-SAVED_DIR = 'data/model'
+BASE_DIR = '../data/'
+SAVED_DIR = '../saved_models/regvd/'
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, required=True, help='Name of the dataset for experiment.')
-    parser.add_argument('--test_split', type=str, required=True, help='Name of the dataset for experiment.')
-    parser.add_argument('--seed', type=int, required=True, help='Name of the dataset for experiment.')
-    parser.add_argument('--batch_size', type=int, required=True, help='Name of the dataset for experiment.')
+    parser.add_argument('--dataset', type=str, default="devign", help='Name of the dataset for experiment.')
+    parser.add_argument('--test_split', type=str, default="test", help='Name of the dataset for experiment.')
+    parser.add_argument('--seed', type=int, default=123456, help='Name of the dataset for experiment.')
+    parser.add_argument('--batch_size', type=int, default=128, help='Name of the dataset for experiment.')
 
     ar = parser.parse_args()
 
