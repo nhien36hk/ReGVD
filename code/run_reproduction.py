@@ -219,11 +219,10 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
     model.zero_grad()
  
     for idx in range(args.start_epoch, int(args.num_train_epochs)): 
-        # bar = tqdm(train_dataloader,total=len(train_dataloader))
+        bar = tqdm(train_dataloader, total=len(train_dataloader))
         tr_num=0
         train_loss=0
-        # for step, batch in enumerate(bar):
-        for step, batch in enumerate(train_dataloader):
+        for step, batch in enumerate(bar):
             inputs = batch[0].to(args.device)
             labels=batch[1].to(args.device) 
             model.train()
