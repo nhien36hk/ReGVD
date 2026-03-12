@@ -553,8 +553,8 @@ class Args:
         self.model_type = "roberta"
         self.tokenizer_name="microsoft/graphcodebert-base"
         self.model_name_or_path = "microsoft/graphcodebert-base"
-        self.do_train = True
-        self.do_eval = True
+        self.do_train = False
+        self.do_eval = False
         self.do_test = True
         self.block_size=400
         self.train_batch_size=128
