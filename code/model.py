@@ -95,7 +95,7 @@ class GNNReGVD(nn.Module):
         adj_mask = torch.from_numpy(adj_mask)
         adj_feature = torch.from_numpy(adj_feature)
         # run over GNNs
-        outputs = self.gnn(adj_feature.to(device).double(), adj.to(device).double(), adj_mask.to(device).double())
+        outputs = self.gnn(adj_feature.to(device).float(), adj.to(device).float(), adj_mask.to(device).float())
         logits = self.classifier(outputs)
         prob = F.sigmoid(logits)
         if labels is not None:
@@ -121,19 +121,19 @@ class DevignModel(nn.Module):
         self.gnn = GGGNN(feature_dim_size=args.feature_dim_size, hidden_size=args.hidden_size,
                          num_GNN_layers=args.num_GNN_layers, num_classes=args.num_classes, dropout=config.hidden_dropout_prob)
 
-        self.conv_l1 = torch.nn.Conv1d(args.hidden_size, args.hidden_size, 3).double()
-        self.maxpool1 = torch.nn.MaxPool1d(3, stride=2).double()
-        self.conv_l2 = torch.nn.Conv1d(args.hidden_size, args.hidden_size, 1).double()
-        self.maxpool2 = torch.nn.MaxPool1d(2, stride=2).double()
+        self.conv_l1 = torch.nn.Conv1d(args.hidden_size, args.hidden_size, 3).float()
+        self.maxpool1 = torch.nn.MaxPool1d(3, stride=2).float()
+        self.conv_l2 = torch.nn.Conv1d(args.hidden_size, args.hidden_size, 1).float()
+        self.maxpool2 = torch.nn.MaxPool1d(2, stride=2).float()
 
         self.concat_dim = args.feature_dim_size + args.hidden_size
-        self.conv_l1_for_concat = torch.nn.Conv1d(self.concat_dim, self.concat_dim, 3).double()
-        self.maxpool1_for_concat = torch.nn.MaxPool1d(3, stride=2).double()
-        self.conv_l2_for_concat = torch.nn.Conv1d(self.concat_dim, self.concat_dim, 1).double()
-        self.maxpool2_for_concat = torch.nn.MaxPool1d(2, stride=2).double()
+        self.conv_l1_for_concat = torch.nn.Conv1d(self.concat_dim, self.concat_dim, 3).float()
+        self.maxpool1_for_concat = torch.nn.MaxPool1d(3, stride=2).float()
+        self.conv_l2_for_concat = torch.nn.Conv1d(self.concat_dim, self.concat_dim, 1).float()
+        self.maxpool2_for_concat = torch.nn.MaxPool1d(2, stride=2).float()
 
-        self.mlp_z = nn.Linear(in_features=self.concat_dim, out_features=args.num_classes).double()
-        self.mlp_y = nn.Linear(in_features=args.hidden_size, out_features=args.num_classes).double()
+        self.mlp_z = nn.Linear(in_features=self.concat_dim, out_features=args.num_classes).float()
+        self.mlp_y = nn.Linear(in_features=args.hidden_size, out_features=args.num_classes).float()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input_ids=None, labels=None):
@@ -147,9 +147,9 @@ class DevignModel(nn.Module):
         adj_feature = preprocess_features(x_feature)
         adj = torch.from_numpy(adj)
         adj_mask = torch.from_numpy(adj_mask)
-        adj_feature = torch.from_numpy(adj_feature).to(device).double()
+        adj_feature = torch.from_numpy(adj_feature).to(device).float()
         # run over GGGN
-        outputs = self.gnn(adj_feature.to(device).double(), adj.to(device).double(), adj_mask.to(device).double()).double()
+        outputs = self.gnn(adj_feature.to(device).float(), adj.to(device).float(), adj_mask.to(device).float()).float()
         #
         c_i = torch.cat((outputs, adj_feature), dim=-1)
         batch_size, num_node, _ = c_i.size()

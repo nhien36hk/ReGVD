@@ -23,41 +23,41 @@ class ReGGNN(nn.Module):
         if self.att_op == att_op_dict['concat']:
             self.out_dim = hidden_size * 2
 
-        self.emb_encode = nn.Linear(feature_dim_size, hidden_size).double()
+        self.emb_encode = nn.Linear(feature_dim_size, hidden_size).float()
         self.dropout_encode = nn.Dropout(dropout)
-        self.z0 = nn.Linear(hidden_size, hidden_size).double()
-        self.z1 = nn.Linear(hidden_size, hidden_size).double()
-        self.r0 = nn.Linear(hidden_size, hidden_size).double()
-        self.r1 = nn.Linear(hidden_size, hidden_size).double()
-        self.h0 = nn.Linear(hidden_size, hidden_size).double()
-        self.h1 = nn.Linear(hidden_size, hidden_size).double()
-        self.soft_att = nn.Linear(hidden_size, 1).double()
-        self.ln = nn.Linear(hidden_size, hidden_size).double()
+        self.z0 = nn.Linear(hidden_size, hidden_size).float()
+        self.z1 = nn.Linear(hidden_size, hidden_size).float()
+        self.r0 = nn.Linear(hidden_size, hidden_size).float()
+        self.r1 = nn.Linear(hidden_size, hidden_size).float()
+        self.h0 = nn.Linear(hidden_size, hidden_size).float()
+        self.h1 = nn.Linear(hidden_size, hidden_size).float()
+        self.soft_att = nn.Linear(hidden_size, 1).float()
+        self.ln = nn.Linear(hidden_size, hidden_size).float()
         self.act = act
 
     def gatedGNN(self, x, adj):
         a = torch.matmul(adj, x)
         # update gate
-        z0 = self.z0(a.double())
-        z1 = self.z1(x.double())
+        z0 = self.z0(a.float())
+        z1 = self.z1(x.float())
         z = torch.sigmoid(z0 + z1)
         # reset gate
-        r = torch.sigmoid(self.r0(a.double()) + self.r1(x.double()))
+        r = torch.sigmoid(self.r0(a.float()) + self.r1(x.float()))
         # update embeddings
-        h = self.act(self.h0(a.double()) + self.h1(r.double() * x.double()))
+        h = self.act(self.h0(a.float()) + self.h1(r.float() * x.float()))
 
         return h * z + x * (1 - z)
 
     def forward(self, inputs, adj, mask):
         x = inputs
         x = self.dropout_encode(x)
-        x = self.emb_encode(x.double())
+        x = self.emb_encode(x.float())
         x = x * mask
         for idx_layer in range(self.num_GNN_layers):
             if self.residual:
-                x = x + self.gatedGNN(x.double(), adj.double()) * mask.double()  # add residual connection, can use a weighted sum
+                x = x + self.gatedGNN(x.float(), adj.float()) * mask.float()  # add residual connection, can use a weighted sum
             else:
-                x = self.gatedGNN(x.double(), adj.double()) * mask.double()
+                x = self.gatedGNN(x.float(), adj.float()) * mask.float()
         # soft attention
         soft_att = torch.sigmoid(self.soft_att(x))
         x = self.act(self.ln(x))
@@ -93,8 +93,8 @@ class ReGCN(nn.Module):
                 self.gnnlayers.append(GraphConvolution(feature_dim_size, hidden_size, dropout, act=act))
             else:
                 self.gnnlayers.append(GraphConvolution(hidden_size, hidden_size, dropout, act=act))
-        self.soft_att = nn.Linear(hidden_size, 1).double()
-        self.ln = nn.Linear(hidden_size, hidden_size).double()
+        self.soft_att = nn.Linear(hidden_size, 1).float()
+        self.ln = nn.Linear(hidden_size, hidden_size).float()
         self.act = act
        
     def forward(self, inputs, adj, mask):
@@ -108,7 +108,7 @@ class ReGCN(nn.Module):
                 else:
                     x = self.gnnlayers[idx_layer](x, adj) * mask
         # soft attention
-        soft_att = torch.sigmoid(self.soft_att(x.double()).double())
+        soft_att = torch.sigmoid(self.soft_att(x.float()).float())
         x = self.act(self.ln(x))
         x = soft_att * x * mask
         # sum and max pooling
@@ -127,38 +127,38 @@ class GGGNN(nn.Module):
     def __init__(self, feature_dim_size, hidden_size, num_GNN_layers, dropout, act=nn.functional.relu):
         super(GGGNN, self).__init__()
         self.num_GNN_layers = num_GNN_layers
-        self.emb_encode = nn.Linear(feature_dim_size, hidden_size).double()
+        self.emb_encode = nn.Linear(feature_dim_size, hidden_size).float()
         self.dropout_encode = nn.Dropout(dropout)
-        self.z0 = nn.Linear(hidden_size, hidden_size).double()
-        self.z1 = nn.Linear(hidden_size, hidden_size).double()
-        self.r0 = nn.Linear(hidden_size, hidden_size).double()
-        self.r1 = nn.Linear(hidden_size, hidden_size).double()
-        self.h0 = nn.Linear(hidden_size, hidden_size).double()
-        self.h1 = nn.Linear(hidden_size, hidden_size).double()
-        self.soft_att = nn.Linear(hidden_size, 1).double()
-        self.ln = nn.Linear(hidden_size, hidden_size).double()
+        self.z0 = nn.Linear(hidden_size, hidden_size).float()
+        self.z1 = nn.Linear(hidden_size, hidden_size).float()
+        self.r0 = nn.Linear(hidden_size, hidden_size).float()
+        self.r1 = nn.Linear(hidden_size, hidden_size).float()
+        self.h0 = nn.Linear(hidden_size, hidden_size).float()
+        self.h1 = nn.Linear(hidden_size, hidden_size).float()
+        self.soft_att = nn.Linear(hidden_size, 1).float()
+        self.ln = nn.Linear(hidden_size, hidden_size).float()
         self.act = act
 
     def gatedGNN(self, x, adj):
         a = torch.matmul(adj, x)
         # update gate
-        z0 = self.z0(a.double())
-        z1 = self.z1(x.double())
+        z0 = self.z0(a.float())
+        z1 = self.z1(x.float())
         z = torch.sigmoid(z0 + z1)
         # reset gate
-        r = torch.sigmoid(self.r0(a.double()) + self.r1(x.double()))
+        r = torch.sigmoid(self.r0(a.float()) + self.r1(x.float()))
         # update embeddings
-        h = self.act(self.h0(a.double()) + self.h1(r.double() * x.double()))
+        h = self.act(self.h0(a.float()) + self.h1(r.float() * x.float()))
 
         return h * z + x * (1 - z)
 
     def forward(self, inputs, adj, mask):
         x = inputs
         x = self.dropout_encode(x)
-        x = self.emb_encode(x.double())
+        x = self.emb_encode(x.float())
         x = x * mask
         for idx_layer in range(self.num_GNN_layers):
-            x = self.gatedGNN(x.double(), adj.double()) * mask.double()
+            x = self.gatedGNN(x.float(), adj.float()) * mask.float()
         return x
 
 
@@ -185,8 +185,8 @@ class GraphConvolution(torch.nn.Module):
     def forward(self, input, adj):
         x = self.dropout(input).to(self.weight.device)
         adj = adj.to(self.weight.device)
-        support = torch.matmul(x.double(), self.weight.double())
-        output = torch.matmul(adj.double(), support.double())
+        support = torch.matmul(x.float(), self.weight.float())
+        output = torch.matmul(adj.float(), support.float())
         if self.bias is not None:
             output = output + self.bias
         return self.act(output)
