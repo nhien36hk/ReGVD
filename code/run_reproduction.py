@@ -553,7 +553,7 @@ class Args:
         self.evaluate_during_training = True
         self.gnn="ReGCN"
         self.learning_rate=5e-4
-        self.epoch=1
+        self.epoch=100
         self.hidden_size=256
         self.num_GNN_layers=2
         self.format="uni"
