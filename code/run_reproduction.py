@@ -110,7 +110,7 @@ def convert_examples_to_features(js,tokenizer,args):
     return InputFeatures(source_tokens,source_ids,js['idx'],js['target'])
 
 class TextDataset(Dataset):
-    def __init__(self, tokenizer, args, file_path=None, sample_percent=1.):
+    def __init__(self, tokenizer, args, file_path=None, sample_percent=1., w_embeddings=None):
         self.examples = []
         with open(file_path) as f:
             for line in f:
@@ -124,24 +124,47 @@ class TextDataset(Dataset):
             np.random.seed(10)
             np.random.shuffle(self.examples)
             self.examples = self.examples[:num_keep]
+            
+        # Pre-process graphs during initialization to maximize H100 throughput
+        if w_embeddings is not None:
+            logger.info("Building graphs for %s samples...", len(self.examples))
+            all_input_ids = [np.array(ex.input_ids) for ex in self.examples]
+            
+            # 1. Build graphs
+            if args.format == "uni":
+                adjs, features = build_graph(all_input_ids, w_embeddings, window_size=args.window_size)
+            else:
+                adjs, features = build_graph_text(all_input_ids, w_embeddings, window_size=args.window_size)
+            
+            # 2. Pre-process (Normalization and Padding)
+            adjs, adj_masks = preprocess_adj(adjs)
+            adj_features = preprocess_features(features)
+            
+            # 3. Convert to Tensors and Store
+            self.adjs = torch.from_numpy(adjs).float()
+            self.adj_masks = torch.from_numpy(adj_masks).float()
+            self.adj_features = torch.from_numpy(adj_features).float()
+        else:
+            self.adjs = None
+            self.adj_masks = None
+            self.adj_features = None
 
         if 'train' in file_path:
             logger.info("*** Total Sample ***")
             logger.info("\tTotal: {}\tselected: {}\tpercent: {}\t".format(total_len, num_keep, sample_percent))
-            for idx, example in enumerate(self.examples[:3]):
-                    logger.info("*** Sample ***")
-                    logger.info("Total sample".format(idx))
-                    logger.info("idx: {}".format(idx))
-                    logger.info("label: {}".format(example.label))
-                    logger.info("input_tokens: {}".format([x.replace('\u0120','_') for x in example.input_tokens]))
-                    logger.info("input_ids: {}".format(' '.join(map(str, example.input_ids))))
 
     def __len__(self):
         return len(self.examples)
 
     def __getitem__(self, i):
-        # print(type(self.examples[i].label), self.examples[i].label)
-        return torch.tensor(self.examples[i].input_ids), torch.tensor(int(self.examples[i].label)), self.examples[i].idx
+        input_ids = torch.tensor(self.examples[i].input_ids)
+        label = torch.tensor(int(self.examples[i].label))
+        idx = self.examples[i].idx
+        
+        if self.adjs is not None:
+            return input_ids, label, idx, self.adjs[i], self.adj_masks[i], self.adj_features[i]
+        else:
+            return input_ids, label, idx
             
 
 def set_seed(seed=42):
@@ -224,9 +247,18 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
         train_loss=0
         for step, batch in enumerate(bar):
             inputs = batch[0].to(args.device)
-            labels=batch[1].to(args.device) 
-            model.train()
-            loss,logits = model(inputs,labels)
+            labels = batch[1].to(args.device) 
+            
+            # Unpack pre-processed graph data
+            if len(batch) > 3:
+                adjs = batch[3].to(args.device)
+                adj_masks = batch[4].to(args.device)
+                adj_features = batch[5].to(args.device)
+                model.train()
+                loss, prob = model(inputs, labels=labels, adj=adjs, adj_mask=adj_masks, adj_features=adj_features)
+            else:
+                model.train()
+                loss, prob = model(inputs, labels=labels)
 
 
             if args.n_gpu > 1:
@@ -319,12 +351,20 @@ def evaluate(args, model, tokenizer, eval_dataset=None, eval_when_training=False
     logits=[] 
     labels=[]
     example_indexes = []
-    for batch in eval_dataloader:
+    for batch in tqdm(eval_dataloader, total=len(eval_dataloader), desc="Evaluating"):
         inputs = batch[0].to(args.device)        
-        label=batch[1].to(args.device)
+        label = batch[1].to(args.device)
         indx_ = batch[2]
+        
         with torch.no_grad():
-            lm_loss,logit = model(inputs,label)
+            if len(batch) > 3:
+                adjs = batch[3].to(args.device)
+                adj_masks = batch[4].to(args.device)
+                adj_features = batch[5].to(args.device)
+                lm_loss, logit = model(inputs, labels=label, adj=adjs, adj_mask=adj_masks, adj_features=adj_features)
+            else:
+                lm_loss, logit = model(inputs, labels=label)
+                
             eval_loss += lm_loss.mean().item()
             logits.append(logit.cpu().numpy())
             labels.append(label.cpu().numpy())
@@ -371,22 +411,20 @@ def test(args, model, tokenizer):
     labels=[]
     example_indexes = []
     ind_ = 0
-    for batch in eval_dataloader:
+    for batch in tqdm(eval_dataloader, total=len(eval_dataloader), desc="Testing"):
         inputs = batch[0].to(args.device)
-        label=batch[1].to(args.device)
+        label = batch[1].to(args.device)
         indx_ = batch[2]
-        # The following lines are added based on the user's instruction,
-        # assuming 'adj', 'adj_mask', 'adj_feature' are part of the batch
-        # and are used by the model, even though they are not explicitly
-        # unpacked from 'batch' in the provided code snippet.
-        # If these variables are not present or used, this will cause an error.
-        # This change is made faithfully as per the instruction.
-        # adj = torch.from_numpy(adj).float()
-        # adj_mask = torch.from_numpy(adj_mask).float()
-        # adj_feature = torch.from_numpy(adj_feature).float()
+        
         with torch.no_grad():
             ind_ += 1
-            logit = model(inputs)
+            if len(batch) > 3:
+                adjs = batch[3].to(args.device)
+                adj_masks = batch[4].to(args.device)
+                adj_features = batch[5].to(args.device)
+                logit = model(inputs, adj=adjs, adj_mask=adj_masks, adj_features=adj_features)
+            else:
+                logit = model(inputs)
 
             logits.append(logit.cpu().numpy())
             labels.append(label.cpu().numpy())
@@ -506,11 +544,15 @@ def main(args):
     logger.info("Training/evaluation parameters %s", args)
     # Training
     if args.do_train:
-        if args.local_rank not in [-1, 0]:
+        if args.local_rank == -1 or torch.distributed.get_rank() == 0:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
-        train_dataset = TextDataset(tokenizer, args, args.train_data_file, args.training_percent)
-        eval_dataset = TextDataset(tokenizer, args, args.eval_data_file) if args.evaluate_during_training else None
+        # Extract w_embeddings for pre-processing in Dataset
+        w_embeddings = model.module.encoder.roberta.embeddings.word_embeddings.weight.data.cpu().detach().clone().numpy() if hasattr(model, 'module') else model.encoder.roberta.embeddings.word_embeddings.weight.data.cpu().detach().clone().numpy()
+
+        train_dataset = TextDataset(tokenizer, args, args.train_data_file, args.training_percent, w_embeddings=w_embeddings)
+        eval_dataset = TextDataset(tokenizer, args, args.eval_data_file, w_embeddings=w_embeddings) if args.evaluate_during_training else None
+        
         if args.local_rank == 0:
             torch.distributed.barrier()
 

@@ -82,20 +82,22 @@ class GNNReGVD(nn.Module):
         gnn_out_dim = self.gnn.out_dim
         self.classifier = PredictionClassification(config, args, input_size=gnn_out_dim)
 
-    def forward(self, input_ids=None, labels=None):
-        # construct graph
-        if self.args.format == "uni":
-            adj, x_feature = build_graph(input_ids.cpu().detach().numpy(), self.w_embeddings, window_size=self.args.window_size)
-        else:
-            adj, x_feature = build_graph_text(input_ids.cpu().detach().numpy(), self.w_embeddings, window_size=self.args.window_size)
-        # initilizatioin
-        adj, adj_mask = preprocess_adj(adj)
-        adj_feature = preprocess_features(x_feature)
-        adj = torch.from_numpy(adj)
-        adj_mask = torch.from_numpy(adj_mask)
-        adj_feature = torch.from_numpy(adj_feature)
+    def forward(self, input_ids=None, labels=None, adj=None, adj_mask=None, adj_features=None):
+        # construct graph if not provided
+        if adj is None:
+            if self.args.format == "uni":
+                adj, x_feature = build_graph(input_ids.cpu().detach().numpy(), self.w_embeddings, window_size=self.args.window_size)
+            else:
+                adj, x_feature = build_graph_text(input_ids.cpu().detach().numpy(), self.w_embeddings, window_size=self.args.window_size)
+            # initialization
+            adj, adj_mask = preprocess_adj(adj)
+            adj_feature = preprocess_features(x_feature)
+            adj = torch.from_numpy(adj).float().to(device)
+            adj_mask = torch.from_numpy(adj_mask).float().to(device)
+            adj_features = torch.from_numpy(adj_feature).float().to(device)
+        
         # run over GNNs
-        outputs = self.gnn(adj_feature.to(device).float(), adj.to(device).float(), adj_mask.to(device).float())
+        outputs = self.gnn(adj_features.float(), adj.float(), adj_mask.float())
         logits = self.classifier(outputs)
         prob = F.sigmoid(logits)
         if labels is not None:
@@ -136,22 +138,28 @@ class DevignModel(nn.Module):
         self.mlp_y = nn.Linear(in_features=args.hidden_size, out_features=args.num_classes).float()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, input_ids=None, labels=None):
-        # construct graph
-        if self.args.format == "uni":
-            adj, x_feature = build_graph(input_ids.cpu().detach().numpy(), self.w_embeddings)
+    def forward(self, input_ids=None, labels=None, adj=None, adj_mask=None, adj_features=None):
+        # construct graph if not provided
+        if adj is None:
+            if self.args.format == "uni":
+                adj, x_feature = build_graph(input_ids.cpu().detach().numpy(), self.w_embeddings)
+            else:
+                adj, x_feature = build_graph_text(input_ids.cpu().detach().numpy(), self.w_embeddings)
+            # initialization
+            adj, adj_mask = preprocess_adj(adj)
+            adj_feature = preprocess_features(x_feature)
+            adj = torch.from_numpy(adj).float().to(device)
+            adj_mask = torch.from_numpy(adj_mask).float().to(device)
+            adj_features = torch.from_numpy(adj_feature).float().to(device)
         else:
-            adj, x_feature = build_graph_text(input_ids.cpu().detach().numpy(), self.w_embeddings)
-        # initilization
-        adj, adj_mask = preprocess_adj(adj)
-        adj_feature = preprocess_features(x_feature)
-        adj = torch.from_numpy(adj)
-        adj_mask = torch.from_numpy(adj_mask)
-        adj_feature = torch.from_numpy(adj_feature).to(device).float()
+            adj = adj.float()
+            adj_mask = adj_mask.float()
+            adj_features = adj_features.float()
+
         # run over GGGN
-        outputs = self.gnn(adj_feature.to(device).float(), adj.to(device).float(), adj_mask.to(device).float()).float()
+        outputs = self.gnn(adj_features, adj, adj_mask).float()
         #
-        c_i = torch.cat((outputs, adj_feature), dim=-1)
+        c_i = torch.cat((outputs, adj_features), dim=-1)
         batch_size, num_node, _ = c_i.size()
         Y_1 = self.maxpool1(nn.functional.relu(self.conv_l1(outputs.transpose(1, 2))))
         Y_2 = self.maxpool2(nn.functional.relu(self.conv_l2(Y_1))).transpose(1, 2)
