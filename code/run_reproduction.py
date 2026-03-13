@@ -544,7 +544,7 @@ def main(args):
     logger.info("Training/evaluation parameters %s", args)
     # Training
     if args.do_train:
-        if args.local_rank == -1 or torch.distributed.get_rank() == 0:
+        if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
 
         # Extract w_embeddings for pre-processing in Dataset
