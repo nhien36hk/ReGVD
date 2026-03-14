@@ -3,3 +3,4 @@ logs/
 *.jsonl
 *.json
 *.bin
+data/
