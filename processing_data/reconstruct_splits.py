@@ -53,7 +53,7 @@ def reconstruct_splits(regvd_dir: Path, output_file_json: Path):
 
 if __name__ == "__main__":
     project_root = Path(__file__).parent.parent
-    regvd_path = project_root / "data" / "regvd_data"
+    regvd_path = project_root / "data" / "devign"
     output_path_json = project_root / "data" / "v0" / "splits_reveal.json"
     
     reconstruct_splits(regvd_path, output_path_json)
