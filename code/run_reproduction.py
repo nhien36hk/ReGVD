@@ -235,8 +235,10 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
     # model.resize_token_embeddings(len(tokenizer))
     model.zero_grad()
  
+    import time
     for idx in range(args.start_epoch, int(args.num_train_epochs)): 
-        bar = tqdm(train_dataloader, total=len(train_dataloader))
+        start_time = time.time()
+        bar = tqdm(train_dataloader, total=len(train_dataloader), desc="Epoch {}".format(idx))
         tr_num=0
         train_loss=0
         for step, batch in enumerate(bar):
@@ -275,8 +277,7 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
                 avg_loss=tr_loss
             avg_loss=round(train_loss/tr_num,5)
 
-            # bar.set_description("epoch {} loss {}".format(idx, avg_loss))
-            # logger.info("epoch {} loss {}".format(idx, avg_loss))
+            bar.set_description("epoch {} loss {}".format(idx, avg_loss))
 
                 
             if (step + 1) % args.gradient_accumulation_steps == 0:
@@ -313,7 +314,8 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
                         torch.save(model_to_save.state_dict(), output_dir)
                         logger.info("Saving model checkpoint to %s", output_dir)
         avg_loss = round(train_loss / tr_num, 5)
-        logger.info("epoch {} loss {}".format(idx, avg_loss))
+        epoch_time = time.time() - start_time
+        logger.info("epoch {} loss {} | time: {:.2f}s".format(idx, avg_loss, epoch_time))
                         
 
 def evaluate(args, model, tokenizer, eval_dataset=None, eval_when_training=False):
