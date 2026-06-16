@@ -661,7 +661,10 @@ if __name__ == "__main__":
     arg = Args()
     arg.train_data_file = os.path.join(dataset_dir, 'train.json')
     arg.test_data_file = os.path.join(dataset_dir, '{}.json'.format(ar.test_split))
-    arg.eval_data_file = os.path.join(dataset_dir, 'valid.json')
+    eval_file = os.path.join(dataset_dir, 'valid.json')
+    if not os.path.exists(eval_file):
+        eval_file = os.path.join(dataset_dir, 'val.json')
+    arg.eval_data_file = eval_file
     arg.output_dir = output_dir
     arg.seed = ar.seed
     arg.train_batch_size = ar.batch_size
