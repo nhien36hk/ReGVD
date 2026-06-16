@@ -234,7 +234,7 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
     global_step = args.start_step
     tr_loss, logging_loss,avg_loss,tr_nb,tr_num,train_loss = 0.0, 0.0,0.0,0,0,0
     best_mrr=0.0
-    best_acc=0.0
+    best_f1=0.0
     # model.resize_token_embeddings(len(tokenizer))
     model.zero_grad()
  
@@ -302,13 +302,13 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
                             logger.info("  %s = %s", key, round(value,4))                    
                         # Save model checkpoint
                         
-                    if results['eval_acc']>best_acc:
-                        best_acc=results['eval_acc']
+                    if results['eval_f1']>best_f1:
+                        best_f1=results['eval_f1']
                         logger.info("  "+"*"*20)  
-                        logger.info("  Best acc:%s",round(best_acc,4))
+                        logger.info("  Best F1:%s",round(best_f1,4))
                         logger.info("  "+"*"*20)                          
                         
-                        checkpoint_prefix = 'checkpoint-best-acc'
+                        checkpoint_prefix = 'checkpoint-best-f1'
                         output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))                        
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)                        
@@ -378,10 +378,16 @@ def evaluate(args, model, tokenizer, eval_dataset=None, eval_when_training=False
     eval_acc=np.mean(labels==preds)
     eval_loss = eval_loss / nb_eval_steps
     perplexity = torch.tensor(eval_loss)
+    eval_f1 = f1_score(labels, preds) * 100
+    eval_precision = precision_score(labels, preds, zero_division=0) * 100
+    eval_recall = recall_score(labels, preds, zero_division=0) * 100
             
     result = {
         "eval_loss": float(perplexity),
-        "eval_acc":round(eval_acc,4),
+        "eval_acc": round(eval_acc,4),
+        "eval_f1": round(eval_f1,4),
+        "eval_precision": round(eval_precision,4),
+        "eval_recall": round(eval_recall,4),
     }
     return result
 
@@ -562,7 +568,7 @@ def main(args):
     # Evaluation
     results = {}
     if args.do_eval and args.local_rank in [-1, 0]:
-            checkpoint_prefix = 'checkpoint-best-acc/model.bin'
+            checkpoint_prefix = 'checkpoint-best-f1/model.bin'
             output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
             model.load_state_dict(torch.load(output_dir))      
             model.to(args.device)
@@ -572,7 +578,7 @@ def main(args):
                 logger.info("  %s = %s", key, str(round(result[key],4)))
             
     if args.do_test and args.local_rank in [-1, 0]:
-            checkpoint_prefix = 'checkpoint-best-acc/model.bin'
+            checkpoint_prefix = 'checkpoint-best-f1/model.bin'
             output_dir = os.path.join(args.output_dir, '{}'.format(checkpoint_prefix))  
             model.load_state_dict(torch.load(output_dir, map_location=args.device))                  
             model.to(args.device)
