@@ -15,3 +15,14 @@ echo "Starting training on Reveal dataset..."
 echo "=================================================="
 python3 -u run_reproduction.py --dataset reveal_split --seed 123456 --batch_size 128 > ../reveal_reproduce.log 2>&1
 
+# 3. Run MSR
+echo "=================================================="
+echo "Starting training on MSR dataset..."
+echo "=================================================="
+python3 -u run_reproduction.py --dataset msr_split --seed 123456 --batch_size 128 > ../msr_reproduce.log 2>&1
+
+# 4. Run PrimeVul
+echo "=================================================="
+echo "Starting training on PrimeVul dataset..."
+echo "=================================================="
+python3 -u run_reproduction.py --dataset primevul_split --seed 123456 --batch_size 128 > ../primevul_reproduce.log 2>&1
