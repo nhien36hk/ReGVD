@@ -4,3 +4,7 @@ logs/
 *.json
 *.bin
 data/
+paper/
+.learnings/
+*.log
+*.csv

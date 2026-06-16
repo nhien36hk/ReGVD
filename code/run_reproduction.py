@@ -113,8 +113,8 @@ class TextDataset(Dataset):
     def __init__(self, tokenizer, args, file_path=None, sample_percent=1., w_embeddings=None):
         self.examples = []
         with open(file_path) as f:
-            for line in f:
-                js=json.loads(line.strip())
+            data = json.load(f)
+            for js in data:
                 self.examples.append(convert_examples_to_features(js, tokenizer, args))
 
         total_len = len(self.examples)
@@ -660,9 +660,9 @@ if __name__ == "__main__":
     output_dir = os.path.join(SAVED_DIR, ar.dataset, str(ar.seed))
 
     arg = Args()
-    arg.train_data_file = os.path.join(dataset_dir, 'train.jsonl')
-    arg.test_data_file = os.path.join(dataset_dir, '{}.jsonl'.format(ar.test_split))
-    arg.eval_data_file = os.path.join(dataset_dir, 'valid.jsonl')
+    arg.train_data_file = os.path.join(dataset_dir, 'train.json')
+    arg.test_data_file = os.path.join(dataset_dir, '{}.json'.format(ar.test_split))
+    arg.eval_data_file = os.path.join(dataset_dir, 'valid.json')
     arg.output_dir = output_dir
     arg.seed = ar.seed
     arg.train_batch_size = ar.batch_size
