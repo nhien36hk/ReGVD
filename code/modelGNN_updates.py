@@ -207,7 +207,7 @@ def build_graph(shuffle_doc_words_list, word_embeddings, window_size=3, return_i
     doc_len_list = []
     vocab_set = set()
 
-    for i in tqdm(range(len(shuffle_doc_words_list)), desc="Building graph"):
+    for i in range(len(shuffle_doc_words_list)):
         doc_words = shuffle_doc_words_list[i]
         # print(doc_words)
         doc_len = len(doc_words)
@@ -280,7 +280,7 @@ def build_graph_text(shuffle_doc_words_list, word_embeddings, window_size=3):
     # print('using window size = ', window_size)
     x_adj = []
     x_feature = []
-    for i in tqdm(range(len(shuffle_doc_words_list)), desc="Building graph (text)"):
+    for i in range(len(shuffle_doc_words_list)):
         doc_words = shuffle_doc_words_list[i]
         doc_len = len(doc_words)
 
