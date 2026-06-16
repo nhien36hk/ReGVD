@@ -96,7 +96,7 @@ def remove_comments(string):
             return match.group(1) # captured quoted-string
     return regex.sub(_replacer, string)
         
-def convert_examples_to_features(js,tokenizer,args):
+def convert_examples_to_features(js,tokenizer,args, idx=None):
     #source
     # codes = remove_comments(js['func'])
     code=' '.join(js['func'].split())
@@ -107,7 +107,10 @@ def convert_examples_to_features(js,tokenizer,args):
     source_ids =  tokenizer.convert_tokens_to_ids(source_tokens)
     padding_length = args.block_size - len(source_ids)
     source_ids+=[tokenizer.pad_token_id]*padding_length
-    return InputFeatures(source_tokens,source_ids,js['idx'],js['target'])
+    
+    item_idx = js.get('idx', js.get('index', js.get('id', idx)))
+    label = js.get('target', js.get('label', 0))
+    return InputFeatures(source_tokens,source_ids,item_idx,label)
 
 class TextDataset(Dataset):
     def __init__(self, tokenizer, args, file_path=None, sample_percent=1., w_embeddings=None):
@@ -116,8 +119,8 @@ class TextDataset(Dataset):
         self.w_embeddings = w_embeddings
         with open(file_path) as f:
             data = json.load(f)
-            for js in data:
-                self.examples.append(convert_examples_to_features(js, tokenizer, args))
+            for i, js in enumerate(data):
+                self.examples.append(convert_examples_to_features(js, tokenizer, args, idx=i))
 
         total_len = len(self.examples)
         num_keep = int(sample_percent * total_len)
