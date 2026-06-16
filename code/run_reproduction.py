@@ -112,6 +112,8 @@ def convert_examples_to_features(js,tokenizer,args):
 class TextDataset(Dataset):
     def __init__(self, tokenizer, args, file_path=None, sample_percent=1., w_embeddings=None):
         self.examples = []
+        self.args = args
+        self.w_embeddings = w_embeddings
         with open(file_path) as f:
             data = json.load(f)
             for js in data:
@@ -124,30 +126,6 @@ class TextDataset(Dataset):
             np.random.seed(10)
             np.random.shuffle(self.examples)
             self.examples = self.examples[:num_keep]
-            
-        # Pre-process graphs during initialization to maximize H100 throughput
-        if w_embeddings is not None:
-            logger.info("Building graphs for %s samples...", len(self.examples))
-            all_input_ids = [np.array(ex.input_ids) for ex in self.examples]
-            
-            # 1. Build graphs
-            if args.format == "uni":
-                adjs, features = build_graph(all_input_ids, w_embeddings, window_size=args.window_size)
-            else:
-                adjs, features = build_graph_text(all_input_ids, w_embeddings, window_size=args.window_size)
-            
-            # 2. Pre-process (Normalization and Padding)
-            adjs, adj_masks = preprocess_adj(adjs)
-            adj_features = preprocess_features(features)
-            
-            # 3. Convert to Tensors and Store
-            self.adjs = torch.from_numpy(adjs).float()
-            self.adj_masks = torch.from_numpy(adj_masks).float()
-            self.adj_features = torch.from_numpy(adj_features).float()
-        else:
-            self.adjs = None
-            self.adj_masks = None
-            self.adj_features = None
 
         if 'train' in file_path:
             logger.info("*** Total Sample ***")
@@ -160,11 +138,27 @@ class TextDataset(Dataset):
         input_ids = torch.tensor(self.examples[i].input_ids)
         label = torch.tensor(int(self.examples[i].label))
         idx = self.examples[i].idx
+        return input_ids, label, idx
+
+    def collate_fn(self, batch):
+        input_ids = torch.stack([item[0] for item in batch])
+        labels = torch.stack([item[1] for item in batch])
+        idxs = [item[2] for item in batch]
         
-        if self.adjs is not None:
-            return input_ids, label, idx, self.adjs[i], self.adj_masks[i], self.adj_features[i]
+        if self.w_embeddings is not None:
+            all_input_ids_np = [item[0].numpy() for item in batch]
+            
+            if self.args.format == "uni":
+                adjs, features = build_graph(all_input_ids_np, self.w_embeddings, window_size=self.args.window_size)
+            else:
+                adjs, features = build_graph_text(all_input_ids_np, self.w_embeddings, window_size=self.args.window_size)
+            
+            adjs, adj_masks = preprocess_adj(adjs)
+            adj_features = preprocess_features(features)
+            
+            return input_ids, labels, idxs, torch.from_numpy(adjs).float(), torch.from_numpy(adj_masks).float(), torch.from_numpy(adj_features).float()
         else:
-            return input_ids, label, idx
+            return input_ids, labels, idxs
             
 
 def set_seed(seed=42):
@@ -182,7 +176,7 @@ def train(args, train_dataset, model, tokenizer, eval_dataset=None):
     train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
     
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, 
-                                  batch_size=args.train_batch_size,num_workers=4,pin_memory=True)
+                                  batch_size=args.train_batch_size,num_workers=4,pin_memory=True, collate_fn=train_dataset.collate_fn)
     args.max_steps=args.epoch*len( train_dataloader)
     args.save_steps=len( train_dataloader)
     args.warmup_steps=len( train_dataloader)
@@ -335,7 +329,7 @@ def evaluate(args, model, tokenizer, eval_dataset=None, eval_when_training=False
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size,num_workers=4,pin_memory=True)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size,num_workers=4,pin_memory=True, collate_fn=eval_dataset.collate_fn)
 
     # multi-gpu evaluate
     if args.n_gpu > 1 and eval_when_training is False:
@@ -394,7 +388,7 @@ def test(args, model, tokenizer):
     args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset) if args.local_rank == -1 else DistributedSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size, collate_fn=eval_dataset.collate_fn)
 
     # multi-gpu evaluate
     if args.n_gpu > 1:
