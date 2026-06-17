@@ -442,6 +442,8 @@ def test(args, model, tokenizer):
     preds=logits[:,0]>0.5
 
     if args.save_results:
+        if not os.path.exists(args.result_dir):
+            os.makedirs(args.result_dir)
         df = pd.DataFrame()
         df['example_index'] = example_indexes
         df['prediction'] = [1 if x else 0 for x in preds]
