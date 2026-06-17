@@ -660,6 +660,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_split', type=str, default="test", help='Name of the dataset for experiment.')
     parser.add_argument('--seed', type=int, default=123456, help='Name of the dataset for experiment.')
     parser.add_argument('--batch_size', type=int, default=128, help='Name of the dataset for experiment.')
+    parser.add_argument('--only_test', action='store_true', help='Only run test evaluation without training.')
 
     ar = parser.parse_args()
 
@@ -678,6 +679,12 @@ if __name__ == "__main__":
     arg.train_batch_size = ar.batch_size
     arg.eval_batch_size = ar.batch_size
     arg.test_split = ar.test_split
+    
+    if ar.only_test:
+        arg.do_train = False
+        arg.do_eval = False
+        arg.do_test = True
+
     print(arg.test_data_file)
 
     main(arg)
